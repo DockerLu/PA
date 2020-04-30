@@ -1,0 +1,132 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+
+
+```{r}
+# get gapdays
+library(readxl)
+alldata=read_excel("/Users/luxiong/Dropbox/Actuarial research seminar/Humana case competition/Team folder/Tingting Sun/PA/alldata.xlsx")
+colnames(alldata)
+x = alldata
+x[,3]=as.Date(x[,3],origin="1899-12-30")
+x[,4]=as.Date(x[,4],origin="1899-12-30")
+gapdays=c()
+
+for(i in 2:length(x$`PATIENT/ENCOUNTER NUMBER`)){
+  if(x$PATIENT.HISTORY.NUMBER[i] == x$PATIENT.HISTORY.NUMBER[i-1]){
+  gapdays[i-1]=abs(x$PATIENT.ADMIT.DATE[i]-x$PATIENT.DISCHARGE.DATE[i-1])
+  }else{
+  gapdays[i-1]=NA
+  }
+}
+gapdays[length(x$`PATIENT/ENCOUNTER NUMBER`)] = -1
+x=cbind(x,gapdays)
+index = which(gapdays >-1)
+x=x[index,]
+index=which(x$Patient.Days>0)
+x=x[index,]
+x=x[,-5]# no age
+library("writexl")
+write_xlsx(data,"/Users/luxiong/Dropbox/Actuarial research seminar/Humana case competition/Team folder/Tingting Sun/Dr. Xiong/data.xlsx")
+summary(x)
+
+```
+# Task1–Explore the relationship of each variable to gapdays
+```{r}
+library(plyr)
+library(dplyr)
+
+data = read_excel("/Users/luxiong/Dropbox/Actuarial research seminar/Humana case competition/Team folder/Tingting Sun/Dr. Xiong/data.xlsx")
+
+library(ggplot2)
+data_tail=tail(data,10000)
+p1 <- ggplot(data_tail, aes(x=1:nrow(data_tail),y=gapdays)) + geom_point(alpha=0.2)
+print(p1)
+
+p2 <- ggplot(data_tail, aes(x=1:nrow(data_tail),y=Age)) + geom_point(alpha=0.2)
+print(p2)
+
+p3 <- ggplot(data, aes(x=gapdays)) + geom_histogram()+xlab("Gap Days")
+print(p3)
+
+p <- ggplot(data, aes(log(x=gapdays+1))) + geom_histogram()+xlab("log(GapDays)")
+print(p)
+
+ageGroup=c()
+for (row in 1:nrow(data)){
+  age=data$Age[row];
+  if (age<=10){
+     ageGroup[row]="0-10"
+  }else if (age<=20){
+    ageGroup[row]="10-20"
+  }else if (age<=30){
+    ageGroup[row]="20-30"
+  }else if (age<=40){
+    ageGroup[row]="30-40"
+  }else if (age<=50){
+    ageGroup[row]="40-50"
+  }else if (age<=60){
+    ageGroup[row]="50-60"
+  }else if (age<=70){
+    ageGroup[row]="60-70"
+  }else if (age<=80){
+    ageGroup[row]="70-80"
+  }else if (age<=90){
+    ageGroup[row]="80-90"
+  }else if (age<=100){
+    ageGroup[row]="90-100"
+  }else{
+    ageGroup[row]="100+"
+  }
+}
+data$ageGroup=ageGroup
+data <- data[c(1:(ncol(data)-2),22,21)]#reorder the column
+vars <- colnames(data)[7:ncol(data)-1]
+
+for (i in vars) {
+  plot <- ggplot(data, aes(x=as.factor(data[[i]]),y=log(gapdays))) + geom_boxplot() + labs(x=i)
+  print(plot)
+}
+
+
+
+```
+#Task2–Reduce the number of factor levels where appropriate
+```{r}
+#library(dplyr)
+library(plyr)
+dat=data
+dat=plyr::rename(dat, c("PATIENT/ENCOUNTER.NUMBER"="PatientEncounterNumber","PATIENT.HISTORY.NUMBER"="PatientHistoryNumber","PATIENT.HISTORY.NUMBER"="PatientHistoryNumber","PATIENT.DISCHARGE.DATE"="PatientDischargeDate","I/O.CODE"="IO_CODE","ICD-9.DIAGNOST.CODE"="ICD9_DIAGNOST_CODE"))
+
+vars<-colnames(dat)[7:ncol(dat)-1]
+for (i in vars) {
+  print(i)
+  x <- dat %>% group_by_(i)%>%dplyr::summarise(mean=mean(log(gapdays+1)),
+                                   median=median(log(gapdays+1)),
+                                   n = n())#dplyr中的summarise跟plyr中的不一样
+
+  print(x)
+}
+
+#2
+```
+
+
+```{r}
+
+```
+```{r}
+
+```
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
