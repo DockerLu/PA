@@ -1,0 +1,201 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+
+```{r}
+# get gapdays
+library(openxlsx)
+alldata=read.xlsx("C:/Users/HP/Dropbox/Team folder/Tingting Sun/PA/alldata.xlsx")
+x = alldata
+x[,3] = as.Date(x[,3],origin="1899-12-30")
+x[,4] = as.Date(x[,4],origin="1899-12-30")
+x[,15] = as.Date(x[,15],origin = "1899-12-30")
+gapdays = c()
+for(i in 2:length(x$`PATIENT/ENCOUNTER.NUMBER`)){
+  if(x$PATIENT.HISTORY.NUMBER[i] == x$PATIENT.HISTORY.NUMBER[i-1]){
+  gapdays[i-1] = abs(x$PATIENT.ADMIT.DATE[i]-x$PATIENT.DISCHARGE.DATE[i-1])
+  }else{
+  gapdays[i-1] = NA
+  }
+}
+gapdays[length(x$`PATIENT/ENCOUNTER.NUMBER`)] = -1
+x=cbind(x,gapdays)
+index = which(gapdays >-1)
+x = x[index,]
+index = which(x$Patient.Days>0)
+x = x[index,]
+
+#age Transform age to age group, 0-10, 10-20, 20-30, …. Then delete the date of birth.
+age = c()
+for(i in 1:length(x$`PATIENT/ENCOUNTER.NUMBER`)){
+  age[i] = floor((x$PATIENT.ADMIT.DATE[i]-x$PATIENT.DATE.OF.BIRTH[i])/3650)
+}
+x$Age = age
+x = x[,-15]
+
+#Nur.Stat
+x$Nur.Stat[which(is.na(x$Nur.Stat))] = 'isNA'
+
+#Transform zipcode to low-income, middle-income, high-income.
+library(openxlsx)
+zip = read.xlsx("C:/Users/HP/Dropbox/Team folder/Tingting Sun/data/income_zip.xlsx")
+colnames(x)[18] = 'ZipCode'
+library("data.table")
+dat = x
+dat = data.table(dat)
+dat$ZipCode = as.character(dat$ZipCode)
+zip = data.table(zip)
+zip$ZipCode = as.character(zip$ZipCode)
+zip = zip[,1:2]
+library("dplyr")
+x = left_join(dat, zip,by = "ZipCode")
+x = na.omit(x)
+label = 1:10
+x[,22]=cut(as.numeric(x[,22]),breaks=c(10000,20000,30000,40000,50000,60000,70000,80000,90000,100000,110000),label,ordered_result = T)
+colnames(x)[22] = 'income_level' 
+x = na.omit(x)
+x <- x[c(1:(ncol(data)-2),22,21)]
+write.xlsx(x,file="C:/Users/HP/Dropbox/Team folder/Tingting Sun/PA/data.xlsx")
+
+```
+
+```{r}
+library(openxlsx)
+data = read.xlsx("C:/Users/HP/Dropbox/Team folder/Tingting Sun/PA/data.xlsx")
+for( i in 5:22){
+  if(i %in% c(5, 6, 22)){
+    data[,i]=as.numeric(data[,i])
+  }else{
+    data[,i]=as.factor(data[,i])
+  }
+}
+#reorder the column
+```
+
+#Task1–Explore the relationship of each variable to gapdays
+```{r}
+library(ggplot2)
+p <- ggplot(data, aes(x = log(gapdays + 1))) + geom_histogram()
+print(p)
+
+vars <- colnames(data)[7:ncol(data)-1]
+for (i in vars) {
+  plot <- ggplot(data, aes(x=as.factor(data[,i]),y=log(gapdays))) + geom_boxplot() + labs(x=i)
+  print(plot)
+}
+```
+
+#Task2–Reduce the number of factor levels where appropriate
+```{r}
+library(plyr)
+library(dplyr)
+dat = read.xlsx("C:/Users/HP/Dropbox/Team folder/Tingting Sun/PA/data.xlsx")
+
+dat = plyr::rename(dat, c("PATIENT/ENCOUNTER.NUMBER"="PatientEncounterNumber","PATIENT.HISTORY.NUMBER"="PatientHistoryNumber","PATIENT.HISTORY.NUMBER"="PatientHistoryNumber","PATIENT.DISCHARGE.DATE"="PatientDischargeDate","I/O.CODE"="IO_CODE","ICD-9.DIAGNOST.CODE"="ICD9_DIAGNOST_CODE"))
+vars<-colnames(dat)[7:ncol(dat)-1]
+for (i in vars) {
+  print(i)
+  x <- dat %>% group_by_(i)%>%dplyr::summarise(mean = mean(log(gapdays+1)),median = median(log(gapdays+1))              ,n = n())#dplyr中的summarise跟plyr中的不一样 
+  print(x)
+}
+
+vars = c("PATIENT.DRG","DOCTOR.NUMBER", "Surgeon", "ICD.PROCEDURE.CODE", "ICD9_DIAGNOST_CODE")
+k = kmeans(dat$PATIENT.DRG,4)
+dat$PATIENT.DRG = k$cluster
+k = kmeans(dat$DOCTOR.NUMBER,4)
+dat$DOCTOR.NUMBER = k$cluster
+k = kmeans(dat$Surgeon,4)
+dat$Surgeon = k$cluster
+k = kmeans(dat$ICD.PROCEDURE.CODE,4)
+dat$ICD.PROCEDURE.CODE = k$cluster
+k = kmeans(dat$ICD9_DIAGNOST_CODE,4)
+dat$ICD9_DIAGNOST_CODE = k$cluster
+write.xlsx(dat,file="C:/Users/HP/Dropbox/Team folder/Tingting Sun/PA/dat.xlsx")
+#I 
+```
+```{r}
+# 因为很多的variable经过kmeans之后，变量内的level是不平衡的
+dat = read.xlsx("C:/Users/HP/Dropbox/Team folder/Tingting Sun/PA/dat.xlsx")
+vars <- colnames(dat)[6:length(dat)-1]
+for (i in vars) {
+  plot <- ggplot(dat, aes(x=dat[,i])) + geom_bar() + labs(x=i) + theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  print(plot)
+}
+```
+# Change 1:
+```{r}
+#Nur.Stat
+dat$Nur.Stat <- as.factor(dat$Nur.Stat)
+levels(dat[,"Nur.Stat"])
+dat2 <- dat
+var <- "Nur.Stat"
+dat2[,var] <- as.factor(dat2[,var])
+var.levels <- levels(dat2[,var])
+dat2[,var] <- mapvalues(dat2[,var],var.levels,c("CCU", "ER","isNA", "MS2",  "MS3",  "PC3",  "WS"))
+#Relevel
+table <- as.data.frame(table(dat2[,var]))
+  max <- which.max(table[,2])
+  level.name <- as.character(table[max,1])
+  dat2[,var] <- relevel(dat2[,var], ref = level.name)
+table(dat2[,var])
+
+```
+
+
+
+#Task3–Use observations from principal components analysis (PCA) to generate a new feature
+```{r}
+library(openxlsx)
+dat = read.xlsx("C:/Users/HP/Dropbox/Team folder/Tingting Sun/PA/dat.xlsx")
+vars <- colnames(dat)[6:length(dat)-1]
+
+for( i in 5:22){
+  if(i %in% c( 6, 22)){
+    dat[,i]=as.numeric(dat[,i])
+  }else{
+    dat[,i]=as.factor(dat[,i])
+  }
+}
+#"HOSPITAL.SERVICE.CODE", "ADMIT.SOURCE", "DISCHARGE.STATUS", "ICD.PROCEDURE.CODE", "ICD9_DIAGNOST_CODE"
+datPCA = dat[,c("PATIENT.DRG", "Nur.Stat","DOCTOR.NUMBER", "Surgeon")]
+library(caret)
+varsPCA = colnames(datPCA)
+for (var in varsPCA) {
+  datPCA[, var] <- as.character(datPCA[, var])
+}
+binarizer <- caret::dummyVars(paste("~", paste(varsPCA, collapse = "+")) , data = datPCA, fullRank = FALSE)
+datPCAbin <- data.frame(predict(binarizer, newdata = datPCA))
+head(datPCAbin)
+PCAweather <- prcomp(datPCAbin, center = TRUE, scale. = TRUE)
+summary(PCAweather)
+PCAweather$rotation
+```
+
+
+
+```{r}
+#This comment is made by Dr. Xiong to test the git version control
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
