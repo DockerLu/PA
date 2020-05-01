@@ -530,21 +530,54 @@ PCAweather <- prcomp(datPCAbin, center = TRUE, scale. = TRUE)
 summary(PCAweather)
 resultPCA <- PCAweather$rotation
 ```
+Create the new feature from the PC1 to replace 3 predictors
+```{r}
+datPCAbin.std <- as.data.frame(scale(datPCAbin))
+#Create a new feature
+dat2 <- dat #Preserving the original data frame []until this work is complete
+dat2$ServCode_DRG_ICD <- phi["HOSPITAL.SERVICE.CODEMED",1]*datPCAbin.std$HOSPITAL.SERVICE.CODEMED +
+  phi["PATIENT.DRG5",1]*datPCAbin.std$PATIENT.DRG5 + phi["HOSPITAL.SERVICE.CODEOPS",1]*datPCAbin.std$HOSPITAL.SERVICE.CODEOPS +
+  phi["ICD.PROCEDURE.CODE1",1]*datPCAbin.std$ICD.PROCEDURE.CODE1 +
+  phi["HOSPITAL.SERVICE.CODEER",1]*datPCAbin.std$HOSPITAL.SERVICE.CODEER +
+  phi["ICD.PROCEDURE.CODE10",1]*datPCAbin.std$ICD.PROCEDURE.CODE10 +
+  phi["PATIENT.DRG10",1]*datPCAbin.std$PATIENT.DRG10
+summary(dat2$WETorDRY)
 
+```
+# Return from dat2 to dat and drop the three variables used to create the new one.
+```{r}
+dat <- dat2
+dat$PATIENT.DRG <- NULL
+dat$HOSPITAL.SERVICE.CODE <- NULL
+dat$ICD.PROCEDURE.CODEE <- NULL
+dat$PatientEncounterNumber <- NULL #delete because not useful
+dat$PatientHistoryNumber <- NULL #delete because not useful
+dat$Age<- as.factor(dat$Age)
+dat <- dat[c(1:(ncol(dat)-2),ncol(dat),ncol(dat)-1)]#reorder the column, to put target in the end
+summary(dat)
+
+#If some levels are not combined correctly, can run this type of code to combine
+# dat[,var] <- as.factor(dat[,var])
+# var.levels <- levels(dat[,var])
+# dat[,var] <- mapvalues(dat[,var],var.levels,c("F","M","F"))
+```
+
+
+TASK 4 Select an interaction
+```{r}
+#See if there is any interation between the Patient.Sex.Code and Age
+ggplot(dat,aes(x=PATIENT.SEX.CODE,y=log(gapdays+1),fill=Age))+
+  geom_boxplot()+
+  facet_wrap(~PATIENT.SEX.CODE,scale="free")
+```
 
 
 ```{r}
 
 ```
-```{r}
 
-```
-```{r}
 
-```
-```{r}
 
-```
 ```{r}
 
 ```
