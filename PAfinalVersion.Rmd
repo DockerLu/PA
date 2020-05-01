@@ -514,9 +514,10 @@ for( i in 5:22){
     dat[,i]=as.factor(dat[,i])
   }
 }
-#"HOSPITAL.SERVICE.CODE", "ADMIT.SOURCE", "DISCHARGE.STATUS", "ICD.PROCEDURE.CODE", "ICD9_DIAGNOST_CODE"
-index = c(1:4,18,22)
-datPCA = dat[,-index]
+#These predictors could be correlated: PATIENT.DRG and HOSPITAL.SERVICE.CODE and ICD9.PROCEDURE.CODE and ICD9_DIAGNOST_CODE could be related.
+#So I explore a PCA using these predictors.
+x_list=c("PATIENT.DRG","HOSPITAL.SERVICE.CODE","ICD.PROCEDURE.CODE","ICD9_DIAGNOST_CODE")
+datPCA = dat[,x_list]
 library(caret)
 varsPCA = colnames(datPCA)
 for (var in varsPCA) {
@@ -527,7 +528,7 @@ datPCAbin <- data.frame(predict(binarizer, newdata = datPCA))
 head(datPCAbin)
 PCAweather <- prcomp(datPCAbin, center = TRUE, scale. = TRUE)
 summary(PCAweather)
-PCAweather$rotation
+resultPCA <- PCAweather$rotation
 ```
 
 
