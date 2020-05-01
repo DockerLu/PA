@@ -1,0 +1,549 @@
+Please set the folder "Tingting Sun" as the working directory before run this file
+Make sure the alldata.xlsx is not changed
+```{r}
+library(openxlsx)
+wd=getwd()
+fullPath=paste0(wd,"/PA/alldata.xlsx")
+alldata=read.xlsx(fullPath)
+x = alldata
+x[,3] = as.Date(x[,3],origin="1899-12-30")
+x[,4] = as.Date(x[,4],origin="1899-12-30")
+x[,15] = as.Date(x[,15],origin = "1899-12-30")
+gapdays = c()
+for(i in 2:length(x$`PATIENT/ENCOUNTER.NUMBER`)){
+  if(x$PATIENT.HISTORY.NUMBER[i] == x$PATIENT.HISTORY.NUMBER[i-1]){
+  gapdays[i-1] = abs(x$PATIENT.ADMIT.DATE[i]-x$PATIENT.DISCHARGE.DATE[i-1])
+  }else{
+  gapdays[i-1] = NA
+  }
+}
+gapdays[length(x$`PATIENT/ENCOUNTER.NUMBER`)] = -1
+x=cbind(x,gapdays)
+index = which(gapdays >-1)
+x = x[index,]
+index = which(x$Patient.Days>0)
+x = x[index,]
+
+#age Transform age to age group, 0-10, 10-20, 20-30, …. Then delete the date of birth.
+age = c()
+for(i in 1:length(x$`PATIENT/ENCOUNTER.NUMBER`)){
+  age[i] = floor((x$PATIENT.ADMIT.DATE[i]-x$PATIENT.DATE.OF.BIRTH[i])/3650)
+}
+x$Age = age
+x = x[,-15]
+
+#Nur.Stat
+x$Nur.Stat[which(is.na(x$Nur.Stat))] = 'isNA'
+
+#Transform zipcode to low-income, middle-income, high-income.
+library(openxlsx)
+fullPath=paste0(wd,"/data/income_zip.xlsx")
+zip = read.xlsx(fullPath)
+colnames(x)[18] = 'ZipCode'
+library("data.table")
+dat = x
+dat = data.table(dat)
+dat$ZipCode = as.character(dat$ZipCode)
+zip = data.table(zip)
+zip$ZipCode = as.character(zip$ZipCode)
+zip = zip[,1:2]
+library("dplyr")
+x = left_join(dat, zip,by = "ZipCode")
+label = 1:10
+x[,22]=cut(as.numeric(x[,22]),breaks=c(10000,20000,30000,40000,50000,60000,70000,80000,90000,100000,110000),label,ordered_result = T)
+colnames(x)[22] = 'income_level' 
+x <- x[c(1:(ncol(x)-2),22,21)]
+x = na.omit(x)
+#write.xlsx(x,file="C:/Users/HP/Dropbox/Team folder/Tingting Sun/PA/data.xlsx")
+```
+
+#Task1–Explore the relationship of each variable to gapdays
+```{r}
+library(openxlsx)
+#data = read.xlsx("C:/Users/HP/Dropbox/Team folder/Tingting Sun/PA/data.xlsx")
+data = x
+for( i in 5:22){
+  if(i %in% c(5, 6, 22)){
+    data[,i]=as.numeric(data[,i])
+  }else{
+    data[,i]=as.factor(data[,i])
+  }
+}
+library(ggplot2)
+p <- ggplot(data, aes(x = log(gapdays + 1))) + geom_histogram()
+print(p)
+
+vars <- colnames(data)[7:ncol(data)-1]
+for (i in vars) {
+  plot <- ggplot(data, aes(x=as.factor(data[,i]),y=log(gapdays))) + geom_boxplot() + labs(x=i)
+  print(plot)
+}
+```
+
+#Task2–Reduce the number of factor levels where appropriate
+```{r}
+library(plyr)
+library(dplyr)
+#dat = read.xlsx("C:/Users/HP/Dropbox/Team folder/Tingting Sun/PA/data.xlsx")
+dat = x
+
+dat = plyr::rename(dat, c("PATIENT/ENCOUNTER.NUMBER"="PatientEncounterNumber","PATIENT.HISTORY.NUMBER"="PatientHistoryNumber","PATIENT.HISTORY.NUMBER"="PatientHistoryNumber","PATIENT.DISCHARGE.DATE"="PatientDischargeDate","I/O.CODE"="IO_CODE","ICD-9.DIAGNOST.CODE"="ICD9_DIAGNOST_CODE"))
+vars <- colnames(dat)[6:length(dat)-1]
+for (i in vars) {
+  plot <- ggplot(dat, aes(x=dat[,i])) + geom_bar() + labs(x=i) + theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  print(plot)
+}
+for( i in 5:22){
+  if(i %in% c(5, 6, 22)){
+    dat[,i]=as.numeric(dat[,i])
+  }else{
+    dat[,i]=as.factor(dat[,i])
+  }
+}
+
+k = kmeans(dat$DOCTOR.NUMBER,10)
+dat$DOCTOR.NUMBER = k$cluster
+k = kmeans(dat$PATIENT.DRG,10)
+dat$PATIENT.DRG = k$cluster
+k = kmeans(dat$Surgeon,10)
+dat$Surgeon = k$cluster
+k = kmeans(dat$DISCHARGE.STATUS,10)
+dat$DISCHARGE.STATUS = k$cluster
+k = kmeans(dat$ICD.PROCEDURE.CODE,10)
+dat$ICD.PROCEDURE.CODE = k$cluster
+k = kmeans(dat$ICD9_DIAGNOST_CODE,10)
+dat$ICD9_DIAGNOST_CODE = k$cluster
+#write.xlsx(x,file="C:/Users/HP/Dropbox/Team folder/Tingting Sun/PA/dat.xlsx")
+```
+
+```{r}
+vars<-colnames(dat)[7:ncol(dat)-1]
+for (i in vars) {
+  print(i)
+  x <- dat %>% group_by_(i)%>%dplyr::summarise(mean = mean(log(gapdays+1)),median = median(log(gapdays+1))              ,n = n())#dplyr中的summarise跟plyr中的不一样 
+  print(x)
+}
+```
+# PATIENT.DRG
+#change1
+```{r}
+#PATIENT.DRG
+i="PATIENT.DRG"
+x=dat %>% group_by_(i)%>%dplyr::summarise(mean=mean(log(gapdays+1)),
+                                   median=median(log(gapdays+1)),
+                                   n = n())
+#Reference: https://www.statmethods.net/advstats/cluster.html
+mydata=x$mean
+d <- dist(mydata, method = "euclidean") # distance matrix
+fit <- hclust(d, method="ward")
+plot(fit) # display dendogram
+groups <- cutree(fit, k=5) # cut tree into 5 clusters
+# draw dendogram with red borders around the 5 clusters
+rect.hclust(fit, k=5, border="red")
+
+dat$PATIENT.DRG <- as.factor(dat$PATIENT.DRG)
+levels(dat[,"PATIENT.DRG"])
+dat2 <- dat
+var <- "PATIENT.DRG"
+dat2[,var] <- as.factor(dat2[,var])
+var.levels <- levels(dat2[,var])
+dat2[,var] <- mapvalues(dat2[,var],var.levels,c("1528","1528","310","49","1528","6","7","1528","49","310"))
+#Relevel
+table <- as.data.frame(table(dat2[,var]))
+  max <- which.max(table[,2])
+  level.name <- as.character(table[max,1])
+  dat2[,var] <- relevel(dat2[,var], ref = level.name)
+table(dat2[,var])
+
+
+```
+
+#Nur.Stat
+# Change 2: 
+```{r}
+#Nur.Stat
+i="Nur.Stat"
+x=dat %>% group_by_(i)%>%dplyr::summarise(mean=mean(log(gapdays+1)),
+                                   median=median(log(gapdays+1)),
+                                   n = n())
+#Reference: https://www.statmethods.net/advstats/cluster.html
+mydata=x$mean
+d <- dist(mydata, method = "euclidean") # distance matrix
+fit <- hclust(d, method="ward")
+plot(fit) # display dendogram
+groups <- cutree(fit, k=5) # cut tree into 5 clusters
+# draw dendogram with red borders around the 5 clusters
+rect.hclust(fit, k=5, border="red")
+
+dat$Nur.Stat <- as.factor(dat$Nur.Stat)
+levels(dat[,"Nur.Stat"])
+dat2 <- dat
+var <- "Nur.Stat"
+dat2[,var] <- as.factor(dat2[,var])
+var.levels <- levels(dat2[,var])
+dat2[,var] <- mapvalues(dat2[,var],var.levels,c("MS_CCU_ER_PC", "MS_CCU_ER_PC","isNA", "MS_CCU_ER_PC",  "MS_CCU_ER_PC",  "MS_CCU_ER_PC",  "WS"))
+#Relevel
+table <- as.data.frame(table(dat2[,var]))
+  max <- which.max(table[,2])
+  level.name <- as.character(table[max,1])
+  dat2[,var] <- relevel(dat2[,var], ref = level.name)
+table(dat2[,var])
+
+```
+
+#DOCTOR.NUMBER
+#change3 
+```{r}
+#DOCTOR.NUMBER
+i="DOCTOR.NUMBER"
+x=dat %>% group_by_(i)%>%dplyr::summarise(mean=mean(log(gapdays+1)),
+                                   median=median(log(gapdays+1)),
+                                   n = n())
+#Reference: https://www.statmethods.net/advstats/cluster.html
+mydata=x$mean
+d <- dist(mydata, method = "euclidean") # distance matrix
+fit <- hclust(d, method="ward")
+plot(fit) # display dendogram
+groups <- cutree(fit, k=5) # cut tree into 5 clusters
+# draw dendogram with red borders around the 5 clusters
+rect.hclust(fit, k=5, border="red")
+
+dat$DOCTOR.NUMBER <- as.factor(dat$DOCTOR.NUMBER)
+levels(dat[,"DOCTOR.NUMBER"])
+dat2 <- dat
+var <- "DOCTOR.NUMBER"
+dat2[,var] <- as.factor(dat2[,var])
+var.levels <- levels(dat2[,var])
+dat2[,var] <- mapvalues(dat2[,var],var.levels,c("r","r","r","r","r","610","r","r","r","r"))
+#Relevel
+table <- as.data.frame(table(dat2[,var]))
+  max <- which.max(table[,2])
+  level.name <- as.character(table[max,1])
+  dat2[,var] <- relevel(dat2[,var], ref = level.name)
+table(dat2[,var])
+
+```
+
+#Surgeon
+#change4
+```{r}
+#Surgeon
+i="Surgeon"
+x=dat %>% group_by_(i)%>%dplyr::summarise(mean=mean(log(gapdays+1)),
+                                   median=median(log(gapdays+1)),
+                                   n = n())
+#Reference: https://www.statmethods.net/advstats/cluster.html
+mydata=x$mean
+d <- dist(mydata, method = "euclidean") # distance matrix
+fit <- hclust(d, method="ward")
+plot(fit) # display dendogram
+groups <- cutree(fit, k=5) # cut tree into 5 clusters
+# draw dendogram with red borders around the 5 clusters
+rect.hclust(fit, k=5, border="red")
+
+dat$Surgeon <- as.factor(dat$Surgeon)
+levels(dat[,"Surgeon"])
+dat2 <- dat
+var <- "Surgeon"
+dat2[,var] <- as.factor(dat2[,var])
+var.levels <- levels(dat2[,var])
+dat2[,var] <- mapvalues(dat2[,var],var.levels,c("1257","1257","346","346","1257","346","1257","8","9","10"))
+#Relevel
+table <- as.data.frame(table(dat2[,var]))
+  max <- which.max(table[,2])
+  level.name <- as.character(table[max,1])
+  dat2[,var] <- relevel(dat2[,var], ref = level.name)
+table(dat2[,var])
+
+```
+#HOSPITAL.SERVICE.CODE
+# Change 5
+```{r}
+#HOSPITAL.SERVICE.CODE
+i="HOSPITAL.SERVICE.CODE"
+x=dat %>% group_by_(i)%>%dplyr::summarise(mean=mean(log(gapdays+1)),
+                                   median=median(log(gapdays+1)),
+                                   n = n())
+#Reference: https://www.statmethods.net/advstats/cluster.html
+mydata=x$mean
+d <- dist(mydata, method = "euclidean") # distance matrix
+fit <- hclust(d, method="ward")
+plot(fit) # display dendogram
+groups <- cutree(fit, k=5) # cut tree into 5 clusters
+# draw dendogram with red borders around the 5 clusters
+rect.hclust(fit, k=5, border="red")
+
+dat$HOSPITAL.SERVICE.CODE <- as.factor(dat$HOSPITAL.SERVICE.CODE)
+levels(dat[,"HOSPITAL.SERVICE.CODE"])
+dat2 <- dat
+var <- "HOSPITAL.SERVICE.CODE"
+dat2[,var] <- as.factor(dat2[,var])
+var.levels <- levels(dat2[,var])
+dat2[,var] <- mapvalues(dat2[,var],var.levels,c("R","R","R","R","581415","R","R","581415","R","R","R","R","R","581415","581415"))
+#Relevel
+table <- as.data.frame(table(dat2[,var]))
+max <- which.max(table[,2])
+level.name <- as.character(table[max,1])
+dat2[,var] <- relevel(dat2[,var], ref = level.name)
+table(dat2[,var])
+```
+
+#ADMIT.SOURCE
+#change6
+```{r}
+#ADMIT.SOURCE
+i="ADMIT.SOURCE"
+x=dat %>% group_by_(i)%>%dplyr::summarise(mean=mean(log(gapdays+1)),
+                                   median=median(log(gapdays+1)),
+                                   n = n())
+#Reference: https://www.statmethods.net/advstats/cluster.html
+mydata=x$mean
+d <- dist(mydata, method = "euclidean") # distance matrix
+fit <- hclust(d, method="ward")
+plot(fit) # display dendogram
+groups <- cutree(fit, k=5) # cut tree into 5 clusters
+# draw dendogram with red borders around the 5 clusters
+rect.hclust(fit, k=5, border="red")
+
+dat$ADMIT.SOURCE <- as.factor(dat$ADMIT.SOURCE)
+levels(dat[,"ADMIT.SOURCE"])
+dat2 <- dat
+var <- "ADMIT.SOURCE"
+dat2[,var] <- as.factor(dat2[,var])
+var.levels <- levels(dat2[,var])
+dat2[,var] <- mapvalues(dat2[,var],var.levels,c("156","234","234","234","156","156","7"))
+#Relevel
+table <- as.data.frame(table(dat2[,var]))
+  max <- which.max(table[,2])
+  level.name <- as.character(table[max,1])
+  dat2[,var] <- relevel(dat2[,var], ref = level.name)
+table(dat2[,var])
+```
+
+#DISCHARGE.STATUS
+#change7 ??
+```{r}
+#DISCHARGE.STATUS
+i="DISCHARGE.STATUS"
+x=dat %>% group_by_(i)%>%dplyr::summarise(mean=mean(log(gapdays+1)),
+                                   median=median(log(gapdays+1)),
+                                   n = n())
+#Reference: https://www.statmethods.net/advstats/cluster.html
+mydata=x$mean
+d <- dist(mydata, method = "euclidean") # distance matrix
+fit <- hclust(d, method="ward")
+plot(fit) # display dendogram
+groups <- cutree(fit, k=5) # cut tree into 5 clusters
+# draw dendogram with red borders around the 5 clusters
+rect.hclust(fit, k=5, border="red")
+
+dat$DISCHARGE.STATUS <- as.factor(dat$DISCHARGE.STATUS)
+levels(dat[,"DISCHARGE.STATUS"])
+dat2 <- dat
+var <- "DISCHARGE.STATUS"
+dat2[,var] <- as.factor(dat2[,var])
+var.levels <- levels(dat2[,var])
+dat2[,var] <- mapvalues(dat2[,var],var.levels,c("12359","12359","12359","467810","12359","467810","467810","467810","12359","467810"))
+#Relevel
+table <- as.data.frame(table(dat2[,var]))
+  max <- which.max(table[,2])
+  level.name <- as.character(table[max,1])
+  dat2[,var] <- relevel(dat2[,var], ref = level.name)
+table(dat2[,var])
+```
+#PATIENT.SEX.CODE
+#change8
+```{r}
+#PATIENT.SEX.CODE
+dat$PATIENT.SEX.CODE <- as.factor(dat$PATIENT.SEX.CODE)
+levels(dat[,"PATIENT.SEX.CODE"])
+dat2 <- dat
+var <- "PATIENT.SEX.CODE"
+dat2[,var] <- as.factor(dat2[,var])
+var.levels <- levels(dat2[,var])
+dat2[,var] <- mapvalues(dat2[,var],var.levels,c("F","M","F"))
+#Relevel
+table <- as.data.frame(table(dat2[,var]))
+  max <- which.max(table[,2])
+  level.name <- as.character(table[max,1])
+  dat2[,var] <- relevel(dat2[,var], ref = level.name)
+table(dat2[,var])
+```
+#PATIENT.MARITAL.STATUS
+#change9
+```{r}
+#PATIENT.MARITAL.STATUS
+i="PATIENT.MARITAL.STATUS"
+x=dat %>% group_by_(i)%>%dplyr::summarise(mean=mean(log(gapdays+1)),
+                                   median=median(log(gapdays+1)),
+                                   n = n())
+#Reference: https://www.statmethods.net/advstats/cluster.html
+mydata=x$mean
+d <- dist(mydata, method = "euclidean") # distance matrix
+fit <- hclust(d, method="ward")
+plot(fit) # display dendogram
+groups <- cutree(fit, k=5) # cut tree into 5 clusters
+# draw dendogram with red borders around the 5 clusters
+rect.hclust(fit, k=5, border="red")
+
+dat$PATIENT.MARITAL.STATUS <- as.factor(dat$PATIENT.MARITAL.STATUS)
+levels(dat[,"PATIENT.MARITAL.STATUS"])
+dat2 <- dat
+var <- "PATIENT.MARITAL.STATUS"
+dat2[,var] <- as.factor(dat2[,var])
+var.levels <- levels(dat2[,var])
+var.levels
+dat2[,var] <- mapvalues(dat2[,var],var.levels,c("DWX","MPS","MPS","MPS","U","DWX","DWX"))
+#Relevel
+table <- as.data.frame(table(dat2[,var]))
+  max <- which.max(table[,2])
+  level.name <- as.character(table[max,1])
+  dat2[,var] <- relevel(dat2[,var], ref = level.name)
+table(dat2[,var])
+```
+#ZipCode
+#change10
+#ICD.PROCEDURE.CODE
+#change11
+```{r}
+#ICD.PROCEDURE.CODE
+i="ICD.PROCEDURE.CODE"
+x=dat %>% group_by_(i)%>%dplyr::summarise(mean=mean(log(gapdays+1)),
+                                   median=median(log(gapdays+1)),
+                                   n = n())
+#Reference: https://www.statmethods.net/advstats/cluster.html
+mydata=x$mean
+d <- dist(mydata, method = "euclidean") # distance matrix
+fit <- hclust(d, method="ward")
+plot(fit) # display dendogram
+groups <- cutree(fit, k=5) # cut tree into 5 clusters
+# draw dendogram with red borders around the 5 clusters
+rect.hclust(fit, k=5, border="red")
+
+dat$ICD.PROCEDURE.CODE <- as.factor(dat$ICD.PROCEDURE.CODE)
+levels(dat[,"ICD.PROCEDURE.CODE"])
+dat2 <- dat
+var <- "ICD.PROCEDURE.CODE"
+dat2[,var] <- as.factor(dat2[,var])
+var.levels <- levels(dat2[,var])
+dat2[,var] <- mapvalues(dat2[,var],var.levels,c("138","2","138","45710","138","6","45710","138","9","45710"))
+#Relevel
+table <- as.data.frame(table(dat2[,var]))
+  max <- which.max(table[,2])
+  level.name <- as.character(table[max,1])
+  dat2[,var] <- relevel(dat2[,var], ref = level.name)
+table(dat2[,var])
+```
+#ICD9_DIAGNOST_CODE
+#change12
+```{r}
+#ICD9_DIAGNOST_CODE
+i="ICD9_DIAGNOST_CODE"
+x=dat %>% group_by_(i)%>%dplyr::summarise(mean=mean(log(gapdays+1)),
+                                   median=median(log(gapdays+1)),
+                                   n = n())
+#Reference: https://www.statmethods.net/advstats/cluster.html
+mydata=x$mean
+d <- dist(mydata, method = "euclidean") # distance matrix
+fit <- hclust(d, method="ward")
+plot(fit) # display dendogram
+groups <- cutree(fit, k=5) # cut tree into 5 clusters
+# draw dendogram with red borders around the 5 clusters
+rect.hclust(fit, k=5, border="red")
+
+dat$ICD9_DIAGNOST_CODE <- as.factor(dat$ICD9_DIAGNOST_CODE)
+levels(dat[,"ICD9_DIAGNOST_CODE"])
+dat2 <- dat
+var <- "ICD9_DIAGNOST_CODE"
+dat2[,var] <- as.factor(dat2[,var])
+var.levels <- levels(dat2[,var])
+dat2[,var] <- mapvalues(dat2[,var],var.levels,c("1","27","3469","3469","510","3469","27","8","3469","510"))
+#Relevel
+table <- as.data.frame(table(dat2[,var]))
+  max <- which.max(table[,2])
+  level.name <- as.character(table[max,1])
+  dat2[,var] <- relevel(dat2[,var], ref = level.name)
+table(dat2[,var])
+```
+
+#income_level
+#change13
+```{r}
+#income_level
+i="income_level"
+x=dat %>% group_by_(i)%>%dplyr::summarise(mean=mean(log(gapdays+1)),
+                                   median=median(log(gapdays+1)),
+                                   n = n())
+#Reference: https://www.statmethods.net/advstats/cluster.html
+mydata=x$mean
+d <- dist(mydata, method = "euclidean") # distance matrix
+fit <- hclust(d, method="ward")
+plot(fit) # display dendogram
+groups <- cutree(fit, k=5) # cut tree into 5 clusters
+# draw dendogram with red borders around the 5 clusters
+rect.hclust(fit, k=5, border="red")
+
+dat$income_level <- as.factor(dat$income_level)
+levels(dat[,"income_level"])
+dat2 <- dat
+var <- "income_level"
+dat2[,var] <- as.factor(dat2[,var])
+var.levels <- levels(dat2[,var])
+dat2[,var] <- mapvalues(dat2[,var],var.levels,c("12","r","12","r","r","r","r","r","r","r"))
+#Relevel
+table <- as.data.frame(table(dat2[,var]))
+  max <- which.max(table[,2])
+  level.name <- as.character(table[max,1])
+  dat2[,var] <- relevel(dat2[,var], ref = level.name)
+table(dat2[,var])
+```
+```{r}
+dat = dat2
+#write.xlsx(dat,file="C:/Users/HP/Dropbox/Team folder/Tingting Sun/PA/dat.xlsx")
+```
+#Task3–Use observations from principal components analysis (PCA) to generate a new feature
+```{r}
+library(openxlsx)
+#dat = read.xlsx("C:/Users/HP/Dropbox/Team folder/Tingting Sun/PA/dat.xlsx")
+vars <- colnames(dat)[6:length(dat)-1]
+
+for( i in 5:22){
+  if(i %in% c( 6, 22)){
+    dat[,i]=as.numeric(dat[,i])
+  }else{
+    dat[,i]=as.factor(dat[,i])
+  }
+}
+#"HOSPITAL.SERVICE.CODE", "ADMIT.SOURCE", "DISCHARGE.STATUS", "ICD.PROCEDURE.CODE", "ICD9_DIAGNOST_CODE"
+index = c(1:4,18,22)
+datPCA = dat[,-index]
+library(caret)
+varsPCA = colnames(datPCA)
+for (var in varsPCA) {
+  datPCA[, var] <- as.character(datPCA[, var])
+}
+binarizer <- caret::dummyVars(paste("~", paste(varsPCA, collapse = "+")) , data = datPCA, fullRank = FALSE)
+datPCAbin <- data.frame(predict(binarizer, newdata = datPCA))
+head(datPCAbin)
+PCAweather <- prcomp(datPCAbin, center = TRUE, scale. = TRUE)
+summary(PCAweather)
+PCAweather$rotation
+```
+
+
+
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
