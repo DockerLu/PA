@@ -504,10 +504,11 @@ dat = dat2
 #Task3–Use observations from principal components analysis (PCA) to generate a new feature
 ```{r}
 library(openxlsx)
-#dat = read.xlsx("C:/Users/HP/Dropbox/Team folder/Tingting Sun/PA/dat.xlsx")
+#dat = read.xlsx("/Users/luxiong/Dropbox/Actuarial research seminar/Humana case competition/Team folder/Tingting Sun/PA/dat2.xlsx")
 vars <- colnames(dat)[6:length(dat)-1]
 
 for( i in 5:22){
+#for( i in 1:17){
   if(i %in% c( 6, 22)){
     dat[,i]=as.numeric(dat[,i])
   }else{
@@ -528,7 +529,7 @@ datPCAbin <- data.frame(predict(binarizer, newdata = datPCA))
 head(datPCAbin)
 PCAweather <- prcomp(datPCAbin, center = TRUE, scale. = TRUE)
 summary(PCAweather)
-resultPCA <- PCAweather$rotation
+phi <- PCAweather$rotation
 ```
 Create the new feature from the PC1 to replace 3 predictors
 ```{r}
@@ -547,9 +548,11 @@ summary(dat2$WETorDRY)
 # Return from dat2 to dat and drop the three variables used to create the new one.
 ```{r}
 dat <- dat2
+###replace 3 PCA variable
 dat$PATIENT.DRG <- NULL
 dat$HOSPITAL.SERVICE.CODE <- NULL
-dat$ICD.PROCEDURE.CODEE <- NULL
+dat$ICD.PROCEDURE.CODE <- NULL
+
 dat$PatientEncounterNumber <- NULL #delete because not useful
 dat$PatientHistoryNumber <- NULL #delete because not useful
 dat$Age<- as.factor(dat$Age)
@@ -569,6 +572,25 @@ TASK 4 Select an interaction
 ggplot(dat,aes(x=PATIENT.SEX.CODE,y=log(gapdays+1),fill=Age))+
   geom_boxplot()+
   facet_wrap(~PATIENT.SEX.CODE,scale="free")
+
+#See if there is any interation between the IO_Code and PATIENT.SEX.CODE
+ggplot(dat,aes(x=IO_CODE,y=log(gapdays+1),fill=PATIENT.SEX.CODE))+
+  geom_boxplot()+
+  facet_wrap(~IO_CODE,scale="free")
+
+#Check the count in each level to make sure there is enough observations.
+nrow(subset(dat,IO_CODE=="I" & PATIENT.SEX.CODE== "F"))
+nrow(subset(dat,IO_CODE=="I" & PATIENT.SEX.CODE== "M"))
+nrow(subset(dat,IO_CODE=="O" & PATIENT.SEX.CODE== "F"))
+nrow(subset(dat,IO_CODE=="O" & PATIENT.SEX.CODE== "M"))
+
+#See if there is any interation between the IO_Code and AGE
+ggplot(dat,aes(x=IO_CODE,y=log(gapdays+1),fill=Age))+
+  geom_boxplot()+
+  facet_wrap(~IO_CODE,scale="free")
+
+
+ 
 ```
 
 
