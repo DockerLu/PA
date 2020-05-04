@@ -483,11 +483,11 @@ phi["ICD9_DIAGNOST_CODE2",1]*datPCAbin.std$ICD9_DIAGNOST_CODE2 +      phi["HOSPI
 phi["ICD.PROCEDURE.CODE5",1]*datPCAbin.std$ICD.PROCEDURE.CODE5 +
 phi["HOSPITAL.SERVICE.CODEB",1]*datPCAbin.std$HOSPITAL.SERVICE.CODEB +
 phi["ICD9_DIAGNOST_CODE3",1]*datPCAbin.std$ICD9_DIAGNOST_CODE3 +
-phi["PATIENT.DRG4",1]*datPCAbin.std$PATIENT.DRG4 + phi["PATIENT.DRG1",1]*datPCAbin.std$PATIENT.DRG1+
+phi["PATIENT.DRG4",1]*datPCAbin.std$PATIENT.DRG4 + phi["PATIENT.DRG1",1]*datPCAbin.std$PATIENT.DRG1
 summary(dat2$ServCode_DRG_ICD)
 
 ```
-# Return from dat2 to dat and drop the three variables used to create the new one.
+# Return from dat2 to dat and drop the four variables used to create the new one.
 
 ```{r}
 dat <- dat2
@@ -557,7 +557,10 @@ print("RMSE")
 sqrt(sum((test$gapdays-predict)^2)/nrow(test))
 
 
-GLMgamma <- glm(log(gapdays+1) ~ ., family = Gamma(link = "log"), data = train)
+#GLMgamma <- glm(log(gapdays+1) ~ ., family = Gamma(link = "log"), data = train)
+GLMgamma <- glm(gapdays+1 ~ ., family = Gamma(link = "log"), data = train)
+#You can understand the above code from this Wiki:
+#泊松回归假设反应变量Y是泊松分布，并假设它期望值的对数可由一组未知参数进行线性表达。
 summary(GLMgamma)
 print("AIC")
 AIC(GLMgamma)
@@ -565,6 +568,38 @@ predict <- predict(GLMgamma,newdata=test,type="response")
 print("RMSE")
 sqrt(sum((test$gapdays-predict)^2)/nrow(test))
 
+#Add the interactions here selected in Task 4, trial 1
+GLMgamma <- glm(gapdays+1 ~ .+ IO_CODE:PATIENT.SEX.CODE + IO_CODE:Age, family = Gamma(link = "log"), data = train)
+#GLMgamma <- glm(gapdays+1 ~ + IO_CODE:PATIENT.SEX.CODE, family = Gamma(link = "log"), data = train)
+#GLMgamma <- glm(gapdays+1 ~ + IO_CODE:Age, family = Gamma(link = "log"), data = train)
+#summary(GLMgamma)
+print("AIC")
+AIC(GLMgamma)
+predict <- predict(GLMgamma,newdata=test,type="response")
+print("RMSE")
+sqrt(sum((test$gapdays-predict)^2)/nrow(test))
+
+#Add the interactions here selected in Task 4, trial 2
+#GLMgamma <- glm(gapdays+1 ~ + IO_CODE:PATIENT.SEX.CODE + IO_CODE:Age, family = Gamma(link = "log"), data = train)
+GLMgamma <- glm(gapdays+1 ~ + IO_CODE:PATIENT.SEX.CODE, family = Gamma(link = "log"), data = train)
+#GLMgamma <- glm(gapdays+1 ~ + IO_CODE:Age, family = Gamma(link = "log"), data = train)
+#summary(GLMgamma)
+print("AIC")
+AIC(GLMgamma)
+predict <- predict(GLMgamma,newdata=test,type="response")
+print("RMSE")
+sqrt(sum((test$gapdays-predict)^2)/nrow(test))
+
+#Add the interactions here selected in Task 4, trial 3
+#GLMgamma <- glm(gapdays+1 ~ + IO_CODE:PATIENT.SEX.CODE + IO_CODE:Age, family = Gamma(link = "log"), data = train)
+GLMgamma <- glm(gapdays+1 ~ + IO_CODE:PATIENT.SEX.CODE, family = Gamma(link = "log"), data = train)
+#GLMgamma <- glm(gapdays+1 ~ + IO_CODE:Age, family = Gamma(link = "log"), data = train)
+#summary(GLMgamma)
+print("AIC")
+AIC(GLMgamma)
+predict <- predict(GLMgamma,newdata=test,type="response")
+print("RMSE")
+sqrt(sum((test$gapdays-predict)^2)/nrow(test))
 ```
 
 
