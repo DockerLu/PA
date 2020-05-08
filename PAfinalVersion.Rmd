@@ -510,6 +510,13 @@ summary(dat)
 #TASK 4 Select an interaction
 ```{r}
 #See if there is any interation between the Patient.Sex.Code and Age
+dat <- read.xlsx("/Users/luxiong/Dropbox/Actuarial research seminar/Humana case competition/Team folder/Tingting Sun/PA/dat_afterPCA.xlsx")
+
+
+lapply(dat, class)#Check the class of each column
+dat[,-c(ncol(dat)-1,ncol(dat))]=lapply(dat[,-c(ncol(dat)-1,ncol(dat))], factor)#Convert to factors, except last 2 columns
+lapply(dat, class)
+
 ggplot(dat,aes(x=PATIENT.SEX.CODE,y=log(gapdays+1),fill=Age))+
   geom_boxplot()+
   facet_wrap(~PATIENT.SEX.CODE,scale="free")
@@ -534,10 +541,8 @@ ggplot(dat,aes(x=IO_CODE,y=log(gapdays+1),fill=Age))+
  
 ```
 
-#Task5–Select a distribution and link function
+Task 5 Select a distribution and link function
 ```{r}
- # dat = read.xlsx(dat,file="C:/Users/HP/Dropbox/Team folder/Tingting Sun/PA/dat_afterPCA.xlsx")
-
 library(caret)
 set.seed(1234)
 partition <- createDataPartition(dat$gapdays, list = FALSE, p = .75)
@@ -555,10 +560,13 @@ AIC(GLMols)
 predict <- predict(GLMols,newdata=test,type="response")
 print("RMSE")
 sqrt(sum((test$gapdays-predict)^2)/nrow(test))
+```
 
 
-#GLMgamma <- glm(log(gapdays+1) ~ ., family = Gamma(link = "log"), data = train)
-GLMgamma <- glm(gapdays+1 ~ ., family = Gamma(link = "log"), data = train)
+
+# This GLM uses a Gamma distribution and the log link. The interaction has been added.
+```{r}
+GLMgamma <- glm(gapdays+1 ~ .+ IO_CODE:PATIENT.SEX.CODE + IO_CODE:Age, family = Gamma(link = "log"), data = train)
 #You can understand the above code from this Wiki:
 #泊松回归假设反应变量Y是泊松分布，并假设它期望值的对数可由一组未知参数进行线性表达。
 summary(GLMgamma)
@@ -567,43 +575,68 @@ AIC(GLMgamma)
 predict <- predict(GLMgamma,newdata=test,type="response")
 print("RMSE")
 sqrt(sum((test$gapdays-predict)^2)/nrow(test))
-
-#Add the interactions here selected in Task 4, trial 1
-GLMgamma <- glm(gapdays+1 ~ .+ IO_CODE:PATIENT.SEX.CODE + IO_CODE:Age, family = Gamma(link = "log"), data = train)
-#GLMgamma <- glm(gapdays+1 ~ + IO_CODE:PATIENT.SEX.CODE, family = Gamma(link = "log"), data = train)
-#GLMgamma <- glm(gapdays+1 ~ + IO_CODE:Age, family = Gamma(link = "log"), data = train)
-#summary(GLMgamma)
-print("AIC")
-AIC(GLMgamma)
-predict <- predict(GLMgamma,newdata=test,type="response")
-print("RMSE")
-sqrt(sum((test$gapdays-predict)^2)/nrow(test))
-
-#Add the interactions here selected in Task 4, trial 2
-#GLMgamma <- glm(gapdays+1 ~ + IO_CODE:PATIENT.SEX.CODE + IO_CODE:Age, family = Gamma(link = "log"), data = train)
-GLMgamma <- glm(gapdays+1 ~ + IO_CODE:PATIENT.SEX.CODE, family = Gamma(link = "log"), data = train)
-#GLMgamma <- glm(gapdays+1 ~ + IO_CODE:Age, family = Gamma(link = "log"), data = train)
-#summary(GLMgamma)
-print("AIC")
-AIC(GLMgamma)
-predict <- predict(GLMgamma,newdata=test,type="response")
-print("RMSE")
-sqrt(sum((test$gapdays-predict)^2)/nrow(test))
-
-#Add the interactions here selected in Task 4, trial 3
-#GLMgamma <- glm(gapdays+1 ~ + IO_CODE:PATIENT.SEX.CODE + IO_CODE:Age, family = Gamma(link = "log"), data = train)
-GLMgamma <- glm(gapdays+1 ~ + IO_CODE:PATIENT.SEX.CODE, family = Gamma(link = "log"), data = train)
-#GLMgamma <- glm(gapdays+1 ~ + IO_CODE:Age, family = Gamma(link = "log"), data = train)
-#summary(GLMgamma)
-print("AIC")
-AIC(GLMgamma)
-predict <- predict(GLMgamma,newdata=test,type="response")
-print("RMSE")
-sqrt(sum((test$gapdays-predict)^2)/nrow(test))
 ```
-
-
-
+# GLM inverse.gaussian.
 ```{r}
+GLMgamma <- glm(gapdays+1 ~ .+ IO_CODE:PATIENT.SEX.CODE + IO_CODE:Age, family = inverse.gaussian(link = "log"), data = train)
+#You can understand the above code from this Wiki:
+#泊松回归假设反应变量Y是泊松分布，并假设它期望值的对数可由一组未知参数进行线性表达。
+summary(GLMgamma)
+print("AIC")
+AIC(GLMgamma)
+predict <- predict(GLMgamma,newdata=test,type="response")
+print("RMSE")
+sqrt(sum((test$gapdays-predict)^2)/nrow(test))
+```
+# GLM gaussian
+```{r}
+GLMgamma <- glm(gapdays+1 ~ .+ IO_CODE:PATIENT.SEX.CODE + IO_CODE:Age, family = gaussian(link = "log"), data = train)
+summary(GLMgamma)
+print("AIC")
+AIC(GLMgamma)
+predict <- predict(GLMgamma,newdata=test,type="response")
+print("RMSE")
+sqrt(sum((test$gapdays-predict)^2)/nrow(test))
+```
+TASK 6 Select features using AIC or BIC
+```{r}
+library(MASS)
+GLMgamma1 <- glm(gapdays+1 ~ 1, family = Gamma(link = "log"), data = train) 
+#Sets up the null model for use with forward selection. The full model was obtained in Task 5.
+stepAIC(GLMgamma1, direction = "forward", k = log(nrow(train)), scope = list(upper = GLMgamma, lower = GLMgamma1),print =FALSE)
+```
+
+# I next run this model to ensure everything looks right and draw any final conclusions.
+```{r}
+GLMgammaR <- glm(gapdays+1 ~ ICD9_DIAGNOST_CODE + DOCTOR.NUMBER + Age + PATIENT.MARITAL.STATUS + 
+    Surgeon + DISCHARGE.STATUS + income_level + Patient.Days, family = Gamma(link = "log"), data = train)
+summary(GLMgammaR)
+print("AIC")
+AIC(GLMgammaR)
+predict <- predict(GLMgammaR,newdata=test,type="response")
+print("RMSE")
+sqrt(sum((test$Crash_Score-predict)^2)/nrow(test))
+```
+# Combine 3 levels to base level: DOCTOR.NUMBER=5, Surgeon=5, Patient.Days=30+
+```{r}
+var="DOCTOR.NUMBER"
+var.levels <- levels(train[,var])
+train[,var] <- mapvalues(train[,var],var.levels,c("1","2","3","4","1"))
+var.levels <- levels(test[,var])
+test[,var] <- mapvalues(test[,var],var.levels,c("1","2","3","4","1"))
+
+var="Surgeon"
+var.levels <- levels(train[,var])
+train[,var] <- mapvalues(train[,var],var.levels,c("1","2","3","4","1"))
+var.levels <- levels(test[,var])
+test[,var] <- mapvalues(test[,var],var.levels,c("1","2","3","4","1"))
+
+var="Patient.Days"
+var.levels <- levels(train[,var])
+train[,var] <- mapvalues(train[,var],var.levels,c("0-19","20-30","0-19"))
+var.levels <- levels(test[,var])
+test[,var] <- mapvalues(test[,var],var.levels,c("0-19","20-30","0-19"))
 
 ```
+
+Task 7
