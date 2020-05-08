@@ -10,10 +10,15 @@ Make sure the alldata.xlsx is not changed
 7. 
 ```{r}
 library(openxlsx)
-wd=getwd()
-fullPath=paste0(wd,"/PA/alldata.xlsx")
+#wd=getwd()
+#fullPath=paste0(wd,"/PA/alldata.xlsx")
 #alldata = read.xlsx("C:/Users/HP/Dropbox/Team folder/Tingting Sun/PA/alldata.xlsx")
-alldata=read.xlsx(fullPath)
+if(Sys.info()["user"]=="luxiong"){
+  alldata <- read.xlsx("/Users/luxiong/Dropbox/Actuarial research seminar/Humana case competition/Team folder/Tingting Sun/PA/alldata.xlsx")
+}else{
+  alldata <- read.xlsx("C:/Users/HP/Dropbox/Team folder/Tingting Sun/PA/alldata.xlsx")
+}
+#alldata=read.xlsx(fullPath)
 x = alldata
 x[,3] = as.Date(x[,3],origin="1899-12-30")
 x[,4] = as.Date(x[,4],origin="1899-12-30")
@@ -44,9 +49,11 @@ x$Age = factor(as.factor(x$Age),levels=c("0","1","2","3","4","5","6","7","8","9"
 x$Nur.Stat[which(is.na(x$Nur.Stat))] = 'isNA'
 #Transform zipcode to low-income, middle-income, high-income.
 library(openxlsx)
-fullPath=paste0(wd,"/data/income_zip.xlsx")
-zip = read.xlsx(fullPath)
-#zip = read.xlsx("C:/Users/HP/Dropbox/Team folder/Tingting Sun/data/income_zip.xlsx")
+if(Sys.info()["user"]=="luxiong"){
+  zip = read.xlsx("/Users/luxiong/Dropbox/Actuarial research seminar/Humana case competition/Team folder/Tingting Sun/H2O case/data/income_zip.xlsx")
+}else{
+  zip = read.xlsx("C:/Users/HP/Dropbox/Team folder/Tingting Sun/H2O case/data/income_zip.xlsx")  
+  }
 colnames(x)[18] = 'ZipCode'
 library("data.table")
 dat = x
@@ -76,6 +83,7 @@ x = x[,-index]
 ```{r}
 library(openxlsx)
 data=x
+#if(Sys.info()["user"]=="luxiong")
 #data = read.xlsx("C:/Users/HP/Dropbox/Team folder/Tingting Sun/PA/data.xlsx")
 for( i in 1:17){
   if(i %in% c(17)){
@@ -132,14 +140,16 @@ for (i in vars) {
   print(i)
   data$Age = factor(as.factor(data$Age),levels=c('0-10','10-20','20-30','30-40','40-50','50-60','60-70','70-80','80-90','90-100','100+'),labels=c('0-10','10-20','20-30','30-40','40-50','50-60','60-70','70-80','80-90','90-100','100+'),ordered = TRUE)
   x <- dat %>% group_by_(i)%>%dplyr::summarise(mean = mean(log(gapdays+1)),median = median(log(gapdays+1))              ,n = n())#dplyr中的summarise跟plyr中的不一样 
-  print(x)
+  #print(x)
+  x = as.data.frame(x)
+  print(x[order(as.numeric(x[,2]),decreasing= T),])
 }
 ```
 
 # PATIENT.DRG
 #change1
 ```{r}
-
+dat3 = dat
 dat2 = dat
 #PATIENT.DRG
 i="PATIENT.DRG"
@@ -167,6 +177,7 @@ max <- which.max(table[,2])
 level.name <- as.character(table[max,1])
 dat2[,var] <- relevel(dat2[,var], ref = level.name)
 table(dat2[,var])
+dat3$PATIENT.DRG = dat2$PATIENT.DRG
 ```
 
 #Nur.Stat
@@ -186,6 +197,7 @@ table <- as.data.frame(table(dat2[,var]))
   level.name <- as.character(table[max,1])
   dat2[,var] <- relevel(dat2[,var], ref = level.name)
 table(dat2[,var])
+dat3$Nur.Stat = dat2$Nur.Stat
 ```
 
 #DOCTOR.NUMBER
@@ -217,6 +229,7 @@ table <- as.data.frame(table(dat2[,var]))
   level.name <- as.character(table[max,1])
   dat2[,var] <- relevel(dat2[,var], ref = level.name)
 table(dat2[,var])
+dat3$DOCTOR.NUMBER = dat2$DOCTOR.NUMBER
 ```
 
 #Surgeon
@@ -248,6 +261,7 @@ table <- as.data.frame(table(dat2[,var]))
   level.name <- as.character(table[max,1])
   dat2[,var] <- relevel(dat2[,var], ref = level.name)
 table(dat2[,var])
+dat3$Surgeon = dat2$Surgeon
 ```
 
 #HOSPITAL.SERVICE.CODE
@@ -266,6 +280,7 @@ max <- which.max(table[,2])
 level.name <- as.character(table[max,1])
 dat2[,var] <- relevel(dat2[,var], ref = level.name)
 table(dat2[,var])
+dat3$HOSPITAL.SERVICE.CODE = dat2$HOSPITAL.SERVICE.CODE
 ```
 
 #ADMIT.SOURCE
@@ -297,6 +312,7 @@ max <- which.max(table[,2])
 level.name <- as.character(table[max,1])
 dat2[,var] <- relevel(dat2[,var], ref = level.name)
 table(dat2[,var])
+dat3$ADMIT.SOURCE = dat2$ADMIT.SOURCE
 ```
 
 #DISCHARGE.STATUS
@@ -315,6 +331,7 @@ table <- as.data.frame(table(dat2[,var]))
   level.name <- as.character(table[max,1])
   dat2[,var] <- relevel(dat2[,var], ref = level.name)
 table(dat2[,var])
+dat3$DISCHARGE.STATUS = dat2$DISCHARGE.STATUS
 ```
 #PATIENT.SEX.CODE
 #change8
@@ -333,6 +350,7 @@ table <- as.data.frame(table(dat2[,var]))
   level.name <- as.character(table[max,1])
   dat2[,var] <- relevel(dat2[,var], ref = level.name)
 table(dat2[,var])
+dat3$PATIENT.SEX.CODE = dat2$PATIENT.SEX.CODE
 ```
 #PATIENT.MARITAL.STATUS
 #change9
@@ -350,6 +368,7 @@ max <- which.max(table[,2])
 level.name <- as.character(table[max,1])
 dat2[,var] <- relevel(dat2[,var], ref = level.name)
 table(dat2[,var])
+dat3$PATIENT.MARITAL.STATUS = dat2$PATIENT.MARITAL.STATUS
 ```
 #change10
 #PATIENT.RACE.CODE
@@ -368,6 +387,7 @@ max <- which.max(table[,2])
 level.name <- as.character(table[max,1])
 dat2[,var] <- relevel(dat2[,var], ref = level.name)
 table(dat2[,var])
+dat3$PATIENT.RACE.CODE = dat2$PATIENT.RACE.CODE
 ```
 
 #ICD.PROCEDURE.CODE
@@ -400,6 +420,7 @@ max <- which.max(table[,2])
 level.name <- as.character(table[max,1])
 dat2[,var] <- relevel(dat2[,var], ref = level.name)
 table(dat2[,var])
+dat3$ICD.PROCEDURE.CODE = dat2$ICD.PROCEDURE.CODE
 ```
 #ICD9_DIAGNOST_CODE
 #change12
@@ -430,17 +451,18 @@ max <- which.max(table[,2])
 level.name <- as.character(table[max,1])
 dat2[,var] <- relevel(dat2[,var], ref = level.name)
 table(dat2[,var])
+dat3$ICD9_DIAGNOST_CODE = dat2$ICD9_DIAGNOST_CODE
 ```
 
 ```{r}
-dat = dat2
-#write.xlsx(dat2,file="C:/Users/HP/Dropbox/Team folder/Tingting Sun/PA/dat2.xlsx")
+dat = dat3
+#write.xlsx(dat3,file="C:/Users/HP/Dropbox/Team folder/Tingting Sun/PA/dat3.xlsx")
 ```
 
 #Task3–Use observations from principal components analysis (PCA) to generate a new feature
 ```{r}
 library(openxlsx)
-#dat = read.xlsx("C:/Users/HP/Dropbox/Team folder/Tingting Sun/PA/dat2.xlsx")
+#dat = read.xlsx("C:/Users/HP/Dropbox/Team folder/Tingting Sun/PA/dat3.xlsx")
 vars <- colnames(dat)[1:length(dat)-1]
 
 for( i in 1:17){
@@ -491,7 +513,7 @@ summary(dat2$ServCode_DRG_ICD)
 
 ```{r}
 dat <- dat2
-###replace 3 PCA variable
+###replace 4 PCA variable
 dat$PATIENT.DRG <- NULL
 dat$HOSPITAL.SERVICE.CODE <- NULL
 dat$ICD.PROCEDURE.CODE <- NULL
@@ -499,7 +521,11 @@ dat$ICD9_DIAGNOST_CODE <- NULL
 dat$Age<- as.factor(dat$Age)
 dat <- dat[c(1:(ncol(dat)-2),ncol(dat),ncol(dat)-1)]#reorder the column, to put target in the end
 summary(dat)
-#write.xlsx(dat,file="C:/Users/HP/Dropbox/Team folder/Tingting Sun/PA/dat_afterPCA.xlsx")
+if(Sys.info()["user"]=="luxiong"){
+  write.xlsx(dat,file="/Users/luxiong/Dropbox/Actuarial research seminar/Humana case competition/Team folder/Tingting Sun/Dr. Xiong/dat_afterPCA.xlsx")
+}else{
+  write.xlsx(dat,file="C:/Users/HP/Dropbox/Team folder/Tingting Sun/PA/dat_afterPCA.xlsx")
+}
 #If some levels are not combined correctly, can run this type of code to combine
 # dat[,var] <- as.factor(dat[,var])
 # var.levels <- levels(dat[,var])
@@ -510,8 +536,11 @@ summary(dat)
 #TASK 4 Select an interaction
 ```{r}
 #See if there is any interation between the Patient.Sex.Code and Age
-dat <- read.xlsx("/Users/luxiong/Dropbox/Actuarial research seminar/Humana case competition/Team folder/Tingting Sun/PA/dat_afterPCA.xlsx")
-
+if(Sys.info()["user"]=="luxiong"){
+  dat <- read.xlsx("/Users/luxiong/Dropbox/Actuarial research seminar/Humana case competition/Team folder/Tingting Sun/Dr. Xiong/dat_afterPCA.xlsx")
+}else{
+  dat <- read.xlsx("C:/Users/HP/Dropbox/Team folder/Tingting Sun/PA/dat_afterPCA.xlsx")
+}
 
 lapply(dat, class)#Check the class of each column
 dat[,-c(ncol(dat)-1,ncol(dat))]=lapply(dat[,-c(ncol(dat)-1,ncol(dat))], factor)#Convert to factors, except last 2 columns
@@ -536,15 +565,17 @@ nrow(subset(dat,IO_CODE=="O" & PATIENT.SEX.CODE== "M"))
 ggplot(dat,aes(x=IO_CODE,y=log(gapdays+1),fill=Age))+
   geom_boxplot()+
   facet_wrap(~IO_CODE,scale="free")
-
-
- 
 ```
 
 Task 5 Select a distribution and link function
 ```{r}
 library(caret)
 set.seed(1234)
+#Remove the order, because the later model not worker well with Age order
+dat$Age <- factor( dat$Age , ordered = FALSE )
+dat$Patient.Days <- factor( dat$Patient.Days , ordered = FALSE )
+dat$income_level <- factor( dat$income_level , ordered = FALSE )
+
 partition <- createDataPartition(dat$gapdays, list = FALSE, p = .75)
 train <- dat[partition, ]
 test <- dat[-partition, ]
@@ -608,8 +639,9 @@ stepAIC(GLMgamma1, direction = "forward", k = log(nrow(train)), scope = list(upp
 
 # I next run this model to ensure everything looks right and draw any final conclusions.
 ```{r}
-GLMgammaR <- glm(gapdays+1 ~ ICD9_DIAGNOST_CODE + DOCTOR.NUMBER + Age + PATIENT.MARITAL.STATUS + 
-    Surgeon + DISCHARGE.STATUS + income_level + Patient.Days, family = Gamma(link = "log"), data = train)
+GLMgammaR <- glm(gapdays+1 ~ DOCTOR.NUMBER + ServCode_DRG_ICD + 
+    Age + Surgeon + PATIENT.MARITAL.STATUS + Nur.Stat + DISCHARGE.STATUS + 
+    income_level + Patient.Days + PATIENT.RACE.CODE + IO_CODE, family = Gamma(link = "log"), data = train)
 summary(GLMgammaR)
 print("AIC")
 AIC(GLMgammaR)
@@ -631,12 +663,59 @@ train[,var] <- mapvalues(train[,var],var.levels,c("1","2","3","4","1"))
 var.levels <- levels(test[,var])
 test[,var] <- mapvalues(test[,var],var.levels,c("1","2","3","4","1"))
 
+var="Nur.Stat"
+var.levels <- levels(train[,var])
+train[,var] <- mapvalues(train[,var],var.levels,c("isNA","isNA","WS"))
+var.levels <- levels(test[,var])
+test[,var] <- mapvalues(test[,var],var.levels,c("isNA","isNA","WS"))
+
 var="Patient.Days"
 var.levels <- levels(train[,var])
 train[,var] <- mapvalues(train[,var],var.levels,c("0-19","20-30","0-19"))
 var.levels <- levels(test[,var])
 test[,var] <- mapvalues(test[,var],var.levels,c("0-19","20-30","0-19"))
 
+var="PATIENT.RACE.CODE"
+var.levels <- levels(train[,var])
+train[,var] <- mapvalues(train[,var],var.levels,c("AIMNT","AIMNT","DH","WX"))
+var.levels <- levels(test[,var])
+test[,var] <- mapvalues(test[,var],var.levels,c("AIMNT","AIMNT","DH","WX"))
 ```
 
 Task 7
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
