@@ -576,6 +576,7 @@ dat$Age <- factor( dat$Age , ordered = FALSE )
 dat$Patient.Days <- factor( dat$Patient.Days , ordered = FALSE )
 dat$income_level <- factor( dat$income_level , ordered = FALSE )
 
+
 partition <- createDataPartition(dat$gapdays, list = FALSE, p = .75)
 train <- dat[partition, ]
 test <- dat[-partition, ]
@@ -652,47 +653,109 @@ sqrt(sum((test$Crash_Score-predict)^2)/nrow(test))
 # Combine 3 levels to base level: DOCTOR.NUMBER=5, Surgeon=5, Patient.Days=30+
 ```{r}
 var="DOCTOR.NUMBER"
-var.levels <- levels(train[,var])
+var.levels <- levels(dat[,var])
+dat[,var] <- mapvalues(dat[,var],var.levels,c("1","2","3","4","1"))
 train[,var] <- mapvalues(train[,var],var.levels,c("1","2","3","4","1"))
-var.levels <- levels(test[,var])
 test[,var] <- mapvalues(test[,var],var.levels,c("1","2","3","4","1"))
 
 var="Surgeon"
-var.levels <- levels(train[,var])
+var.levels <- levels(dat[,var])
+dat[,var] <- mapvalues(dat[,var],var.levels,c("1","2","3","4","1"))
 train[,var] <- mapvalues(train[,var],var.levels,c("1","2","3","4","1"))
-var.levels <- levels(test[,var])
 test[,var] <- mapvalues(test[,var],var.levels,c("1","2","3","4","1"))
 
 var="Nur.Stat"
-var.levels <- levels(train[,var])
+var.levels <- levels(dat[,var])
+dat[,var] <- mapvalues(dat[,var],var.levels,c("isNA","isNA","WS"))
 train[,var] <- mapvalues(train[,var],var.levels,c("isNA","isNA","WS"))
-var.levels <- levels(test[,var])
 test[,var] <- mapvalues(test[,var],var.levels,c("isNA","isNA","WS"))
 
 var="Patient.Days"
-var.levels <- levels(train[,var])
+var.levels <- levels(dat[,var])
+dat[,var] <- mapvalues(dat[,var],var.levels,c("0-19","20-30","0-19"))
 train[,var] <- mapvalues(train[,var],var.levels,c("0-19","20-30","0-19"))
-var.levels <- levels(test[,var])
 test[,var] <- mapvalues(test[,var],var.levels,c("0-19","20-30","0-19"))
 
 var="PATIENT.RACE.CODE"
-var.levels <- levels(train[,var])
+var.levels <- levels(dat[,var])
+dat[,var] <- mapvalues(dat[,var],var.levels,c("AIMNT","AIMNT","DH","WX"))
 train[,var] <- mapvalues(train[,var],var.levels,c("AIMNT","AIMNT","DH","WX"))
-var.levels <- levels(test[,var])
 test[,var] <- mapvalues(test[,var],var.levels,c("AIMNT","AIMNT","DH","WX"))
 ```
 
-Task 7
+Task 7 Validate the model
+#Compare GLM with OLS. GLM here
 ```{r}
+ GLMgammaR <- glm(gapdays+1 ~ DOCTOR.NUMBER + ServCode_DRG_ICD + 
+    Age + Surgeon + PATIENT.MARITAL.STATUS + Nur.Stat + DISCHARGE.STATUS + 
+    income_level + Patient.Days + PATIENT.RACE.CODE + IO_CODE, family = Gamma(link = "log"), data = train)
+summary(GLMgammaR)
+print("AIC")
+AIC(GLMgammaR)
+predict <- predict(GLMgammaR,newdata=test,type="response")
+print("RMSE")
+sqrt(sum((test$gapdays+1-predict)^2)/nrow(test))
+
+plot(GLMgammaR)
+```
+#Compare GLM with OLS. OLS here
+```{r}
+plot(GLMols)
+```
+
+TASK 8 Interpret the model
+# This chunk runs the model from the previous task on the full dataset.
+```{r}
+# ---- ADDITIONAL CODE CREATED ----
+#Gamma model on reduced variables with full dataset
+GLMgammaRdat <- glm(gapdays+1 ~ DOCTOR.NUMBER + ServCode_DRG_ICD + 
+    Age + Surgeon + PATIENT.MARITAL.STATUS + Nur.Stat + DISCHARGE.STATUS + 
+    income_level + Patient.Days + PATIENT.RACE.CODE + IO_CODE, family = Gamma(link = "log"), data =dat)
+summary(GLMgammaRdat)
 
 ```
 
-```{r}
+TASK 9 Investigate ridge and LASSO regressions
+# The interaction term has been added. This chunk performs LASSO regression.
 
+```{r}
+# ---- CODE MODIFIED ----
+library(glmnet)
+set.seed(42)
+
+# for( i in 1:ncol(train)){
+#   if(i %in% c(ncol(train))){
+#     train[,i]=as.numeric(train[,i])
+#     test[,i]=as.numeric(test[,i])
+#   }else{
+#     train[,i]=as.factor(train[,i])
+#     test[,i]=as.numeric(test[,i])
+#   }
+# }
+X <- model.matrix(gapdays+1 ~ .+ IO_CODE:PATIENT.SEX.CODE + IO_CODE:Age, train)
+#X <- model.matrix(gapdays+1 ~ . , data = train)
+
+m <- cv.glmnet(x = X, 
+            y = train$gapdays,
+            family = "gaussian",
+            alpha = 1) #alpha = 1 implies LASSO, alpha = 0 implies ridge
+plot(m)
 ```
+# This chunk completes the LASSO analysis.
 
 ```{r}
+# ---- CODE MODIFIED ---- 
+m.best <- glmnet(x = X, 
+            y = train$gapdays+1,
+            family = "gaussian", lambda = m$lambda.min,
+            alpha = 1)
+X.test <- model.matrix(gapdays+1 ~ .+ IO_CODE:PATIENT.SEX.CODE + IO_CODE:Age, test)
+#X.test <- model.matrix(gapdays+1 ~ . , data=test)
 
+m.best$beta
+m.best.predict <- predict(m.best, newx=X.test)
+rmse <- sqrt(sum((m.best.predict - test$Crash_Score)^2)/nrow(test))
+rmse
 ```
 
 ```{r}
