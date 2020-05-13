@@ -585,11 +585,20 @@ mean(train$gapdays)
 
 print("TEST")
 mean(test$gapdays)
+
 GLMols <- glm(gapdays ~ ., family = gaussian(), data = train)
 summary(GLMols)
 print("AIC")
 AIC(GLMols)
 predict <- predict(GLMols,newdata=test,type="response")
+print("RMSE")
+sqrt(sum((test$gapdays-predict)^2)/nrow(test))
+
+GLMpoisson <- glm(log(gapdays+1) ~ ., family = "poisson", data = train)
+summary(GLMpoisson)
+print("AIC")
+AIC(GLMpoisson)
+predict <- predict(GLMpoisson,newdata=test,type="response")
 print("RMSE")
 sqrt(sum((test$gapdays-predict)^2)/nrow(test))
 ```
@@ -649,6 +658,8 @@ AIC(GLMgammaR)
 predict <- predict(GLMgammaR,newdata=test,type="response")
 print("RMSE")
 sqrt(sum((test$Crash_Score-predict)^2)/nrow(test))
+
+
 ```
 # Combine 3 levels to base level: DOCTOR.NUMBER=5, Surgeon=5, Patient.Days=30+
 ```{r}
@@ -681,6 +692,7 @@ var.levels <- levels(dat[,var])
 dat[,var] <- mapvalues(dat[,var],var.levels,c("AIMNT","AIMNT","DH","WX"))
 train[,var] <- mapvalues(train[,var],var.levels,c("AIMNT","AIMNT","DH","WX"))
 test[,var] <- mapvalues(test[,var],var.levels,c("AIMNT","AIMNT","DH","WX"))
+#It's better to change AIMNT to include black race, because it's combined here.
 ```
 
 Task 7 Validate the model
@@ -754,7 +766,7 @@ X.test <- model.matrix(gapdays+1 ~ .+ IO_CODE:PATIENT.SEX.CODE + IO_CODE:Age, te
 
 m.best$beta
 m.best.predict <- predict(m.best, newx=X.test)
-rmse <- sqrt(sum((m.best.predict - test$Crash_Score)^2)/nrow(test))
+rmse <- sqrt(sum((m.best.predict - (test$gapdays+1) )^2)/nrow(test))
 rmse
 ```
 
